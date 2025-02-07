@@ -114,15 +114,14 @@ func (w *Writer) Write(p []byte) (n int, err error) {
 	total := len(p)
 
 	for len(p) > 0 {
-		n := copy(w.inbuffer[w.fill:], p)
+		n := copy(w.inbuffer[w.fill:ChunkSize], p)
 
 		w.fill += n
 
 		if w.fill == ChunkSize {
-
 			j := &job{
 				last: false,
-				in:   w.inbuffer,
+				in:   w.inbuffer[:ChunkSize],
 				out:  make(chan []byte, 1),
 			}
 
@@ -147,7 +146,7 @@ func (w *Writer) Close() error {
 	if len(w.inbuffer) > 0 {
 		j := &job{
 			last: true,
-			in:   w.inbuffer,
+			in:   w.inbuffer[:w.fill],
 			out:  make(chan []byte, 1),
 		}
 
