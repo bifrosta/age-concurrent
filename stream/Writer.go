@@ -60,7 +60,7 @@ func NewWriter(a cipher.AEAD, dest io.Writer, concurrent int) *Writer {
 	w := &Writer{
 		a: a,
 
-		inbuffer:  make([]byte, ChunkSize),
+		inbuffer:  make([]byte, ChunkSize+chacha20poly1305.Overhead),
 		todo:      make(chan *job, concurrent*2),
 		encrypted: make(chan chan []byte, concurrent*2),
 		done:      make(chan error),
@@ -93,7 +93,7 @@ func NewWriter(a cipher.AEAD, dest io.Writer, concurrent int) *Writer {
 					setLastChunkFlag(&j.nonce)
 				}
 
-				out := w.a.Seal(w.inbuffer[:0], j.nonce[:], j.in, nil)
+				out := w.a.Seal(j.in[:0], j.nonce[:], j.in, nil)
 
 				j.out <- out
 			}
@@ -134,7 +134,7 @@ func (w *Writer) Write(p []byte) (n int, err error) {
 			w.encrypted <- j.out
 
 			w.fill = 0
-			w.inbuffer = make([]byte, ChunkSize)
+			w.inbuffer = make([]byte, ChunkSize+chacha20poly1305.Overhead)
 		}
 
 		p = p[n:]
