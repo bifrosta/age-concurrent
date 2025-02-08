@@ -2,7 +2,6 @@ package stream
 
 import (
 	"crypto/cipher"
-	"fmt"
 	"io"
 	"runtime"
 	"sync"
@@ -49,6 +48,7 @@ type Writer struct {
 	fill      int
 	todo      chan *job
 	encrypted chan chan []byte
+	reuse     chan []byte
 	done      chan error
 }
 
@@ -64,8 +64,11 @@ func NewWriter(a cipher.AEAD, dest io.Writer, concurrent int) *Writer {
 		todo:      make(chan *job, concurrent*2),
 		encrypted: make(chan chan []byte, concurrent*2),
 		done:      make(chan error),
+		reuse:     make(chan []byte, concurrent*2),
 	}
-
+	for i := 0; i < concurrent; i++ {
+		w.reuse <- make([]byte, ChunkSize+chacha20poly1305.Overhead)
+	}
 	go func() {
 		for e := range w.encrypted {
 			buffer := <-e
@@ -76,11 +79,10 @@ func NewWriter(a cipher.AEAD, dest io.Writer, concurrent int) *Writer {
 				// Send them on the done channel.
 				panic(err)
 			}
+			w.reuse <- buffer
 		}
 
 		close(w.done)
-
-		fmt.Printf("Done writing encrypted chunks\n")
 	}()
 
 	var wg sync.WaitGroup
@@ -114,10 +116,6 @@ func (w *Writer) Write(p []byte) (n int, err error) {
 	total := len(p)
 
 	for len(p) > 0 {
-		n := copy(w.inbuffer[w.fill:ChunkSize], p)
-
-		w.fill += n
-
 		if w.fill == ChunkSize {
 			j := &job{
 				last: false,
@@ -133,9 +131,10 @@ func (w *Writer) Write(p []byte) (n int, err error) {
 			w.encrypted <- j.out
 
 			w.fill = 0
-			w.inbuffer = make([]byte, ChunkSize+chacha20poly1305.Overhead)
+			w.inbuffer = <-w.reuse
 		}
-
+		n := copy(w.inbuffer[w.fill:ChunkSize], p)
+		w.fill += n
 		p = p[n:]
 	}
 
