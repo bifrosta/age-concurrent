@@ -63,6 +63,27 @@ writer, _ := age.EncryptN(file, 4, recipient) // Use 4 workers
 reader, _ := age.DecryptN(file, 4, identity)  // Use 4 workers
 ```
 
+## Performance
+
+Benchmark results on an AMD Ryzen 9 7950X 16-Core Processor show some
+speed improvements with increased concurrency:
+
+| CPU Cores      | Read Speed (MB/s) | Write Speed (MB/s) |
+|----------------|-------------------|--------------------|
+| (upstream age) | 3179              | 4202               |
+| 1              | 3897              | **2682**           |
+| 2              | 4760              | 4659               |
+| 4              | 5743              | 5484               |
+| 8              | 7572              | 7479               |
+| 16             | 8758              | 9268               |
+| 32             | **7781**          | 10503              |
+
+Higher concurrency levels generally improve performance,
+particularly for encryption operations. However, performance
+may plateau at very high core counts due to memory bandwidth
+and synchronization overhead. Do your own testing to find the
+optimal concurrency level for your workload and hardware.
+
 ## License
 
 `age-concurrent` is licensed under the same terms as `age`. See the [LICENSE](LICENSE) file for details.
