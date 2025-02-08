@@ -46,7 +46,6 @@ type Writer struct {
 
 	inbuffer  []byte
 	fill      int
-	todo      chan *job
 	encrypted chan chan []byte
 	reuse     chan []byte
 	done      chan error
@@ -60,15 +59,14 @@ func NewWriter(a cipher.AEAD, dest io.Writer, concurrent int) *Writer {
 	w := &Writer{
 		a: a,
 
-		inbuffer:  make([]byte, ChunkSize+chacha20poly1305.Overhead),
-		todo:      make(chan *job, concurrent*2),
-		encrypted: make(chan chan []byte, concurrent*2),
+		encrypted: make(chan chan []byte, concurrent),
 		done:      make(chan error),
-		reuse:     make(chan []byte, concurrent*2),
+		reuse:     make(chan []byte, concurrent),
 	}
 	for i := 0; i < concurrent; i++ {
 		w.reuse <- make([]byte, ChunkSize+chacha20poly1305.Overhead)
 	}
+	w.inbuffer = <-w.reuse
 	go func() {
 		for e := range w.encrypted {
 			buffer := <-e
@@ -88,22 +86,6 @@ func NewWriter(a cipher.AEAD, dest io.Writer, concurrent int) *Writer {
 	var wg sync.WaitGroup
 	wg.Add(concurrent)
 
-	for i := 0; i < concurrent; i++ {
-		go func() {
-			for j := range w.todo {
-				if j.last {
-					setLastChunkFlag(&j.nonce)
-				}
-
-				out := w.a.Seal(j.in[:0], j.nonce[:], j.in, nil)
-
-				j.out <- out
-			}
-
-			wg.Done()
-		}()
-	}
-
 	go func() {
 		wg.Wait()
 		close(w.encrypted)
@@ -117,19 +99,16 @@ func (w *Writer) Write(p []byte) (n int, err error) {
 
 	for len(p) > 0 {
 		if w.fill == ChunkSize {
-			j := &job{
-				last: false,
-				in:   w.inbuffer[:ChunkSize],
-				out:  make(chan []byte, 1),
-			}
+			in := w.inbuffer[:ChunkSize]
+			out := make(chan []byte, 1)
+			nonce := w.nonce
+			go func() {
+				out <- w.a.Seal(in[:0], nonce[:], in, nil)
+			}()
+			w.encrypted <- out
 
-			copy(j.nonce[:], w.nonce[:])
-
+			// Move to next...
 			incNonce(&w.nonce)
-
-			w.todo <- j
-			w.encrypted <- j.out
-
 			w.fill = 0
 			w.inbuffer = <-w.reuse
 		}
@@ -142,20 +121,15 @@ func (w *Writer) Write(p []byte) (n int, err error) {
 }
 
 func (w *Writer) Close() error {
-	if len(w.inbuffer) > 0 {
-		j := &job{
-			last: true,
-			in:   w.inbuffer[:w.fill],
-			out:  make(chan []byte, 1),
-		}
-
-		copy(j.nonce[:], w.nonce[:])
-
-		w.todo <- j
-		w.encrypted <- j.out
+	if w.fill > 0 {
+		in := w.inbuffer[:w.fill]
+		out := make(chan []byte, 1)
+		nonce := w.nonce
+		setLastChunkFlag(&nonce)
+		out <- w.a.Seal(in[:0], nonce[:], in, nil)
+		w.encrypted <- out
 	}
-
-	close(w.todo)
+	close(w.encrypted)
 
 	return <-w.done
 }
