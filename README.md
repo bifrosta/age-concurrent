@@ -84,6 +84,14 @@ may plateau at very high core counts due to memory bandwidth
 and synchronization overhead. Do your own testing to find the
 optimal concurrency level for your workload and hardware.
 
+## Experimental Status
+
+Warning: This project is highly experimental and untested.
+While it aims to provide improved performance over age, it
+has not undergone rigorous security auditing or extensive
+testing. Use at your own risk, and do not rely on it for
+critical applications without performing your own verification.
+
 ## License
 
 `age-concurrent` is licensed under the same terms as `age`. See the [LICENSE](LICENSE) file for details.
