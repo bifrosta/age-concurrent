@@ -1,30 +1,30 @@
 package age
 
 import (
-	"crypto/cipher"
+	"fmt"
 	"reflect"
 	"unsafe"
 )
 
-// extractAEAD will extract the AEAD cipher from a
+// extract will extract a private field from a
 // filippo.io/age/internal/stream Writer or Reader.
 // This is relatively safe, but tied to a specific
 // version of the age module.
-func extractAEAD(d any) cipher.AEAD {
+func extract[T any](d any, field string) T {
 	value := reflect.ValueOf(d)
 	elem := value.Elem()
 
-	field := elem.FieldByName("a")
-	if field.IsZero() {
-		panic("field 'a' not found")
+	fieldValue := elem.FieldByName(field)
+	if fieldValue.IsZero() {
+		panic(fmt.Sprintf("field '%s' not found", field))
 	}
 
-	aeadValue := reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr()))
+	fieldValuePtr := reflect.NewAt(fieldValue.Type(), unsafe.Pointer(fieldValue.UnsafeAddr()))
 
-	aead, ok := aeadValue.Interface().(*cipher.AEAD)
+	fieldValueInterface, ok := fieldValuePtr.Interface().(*T)
 	if !ok {
-		panic("field 'a' has unexpected type")
+		panic(fmt.Sprintf("field '%s' has unexpected type", field))
 	}
 
-	return *aead
+	return *fieldValueInterface
 }

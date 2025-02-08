@@ -1,6 +1,7 @@
 package age
 
 import (
+	"crypto/cipher"
 	"io"
 
 	realage "filippo.io/age"
@@ -29,7 +30,7 @@ func Encrypt(dst io.Writer, recipients ...Recipient) (io.WriteCloser, error) {
 		return nil, err
 	}
 
-	a := extractAEAD(w)
+	a := extract[cipher.AEAD](w, "a")
 
 	return stream.NewWriter(a, dst, 0), nil
 }
@@ -39,6 +40,13 @@ func Encrypt(dst io.Writer, recipients ...Recipient) (io.WriteCloser, error) {
 // It returns a Reader reading the decrypted plaintext of the age file read
 // from src. All identities will be tried until one successfully decrypts the file.
 func Decrypt(src io.Reader, identities ...Identity) (io.Reader, error) {
-	// FIXME: Make this concurrent somehow.
-	return realage.Decrypt(src, identities...)
+	r, err := realage.Decrypt(src, identities...)
+	if err != nil {
+		return nil, err
+	}
+
+	a := extract[cipher.AEAD](r, "a")
+	src = extract[io.Reader](r, "src")
+
+	return stream.NewReader(a, src, 0), nil
 }
