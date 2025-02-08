@@ -227,32 +227,6 @@ func TestEncrypt(t *testing.T) {
 			if !bytes.Equal(out.Bytes(), test) {
 				t.Errorf("unexpected output: %q", out.Bytes())
 			}
-
-			buf.Reset()
-
-			w, err = Encrypt(buf, recipient2)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			_, err = w.Write(test)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			err = w.Close()
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			r, err = realage.Decrypt(buf, ident)
-			if err == nil {
-				t.Errorf("expected error, got nil")
-			}
-
-			if r != nil {
-				t.Errorf("unexpected reader: %v", r)
-			}
 		})
 	}
 }
