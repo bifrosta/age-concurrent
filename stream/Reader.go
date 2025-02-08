@@ -33,7 +33,14 @@ func nonceIsZero(nonce *[chacha20poly1305.NonceSize]byte) bool {
 	return *nonce == [chacha20poly1305.NonceSize]byte{}
 }
 
-func NewReader(a cipher.AEAD, src io.Reader, concurrent int) *Reader {
+func NewReader(arereader io.Reader, concurrent int) *Reader {
+	a := extract[cipher.AEAD](arereader, "a")
+	src := extract[io.Reader](arereader, "src")
+
+	return newReader(a, src, concurrent)
+}
+
+func newReader(a cipher.AEAD, src io.Reader, concurrent int) *Reader {
 	if concurrent < 1 {
 		concurrent = runtime.NumCPU()
 	}

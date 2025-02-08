@@ -1,7 +1,6 @@
 package age
 
 import (
-	"crypto/cipher"
 	"io"
 
 	realage "filippo.io/age"
@@ -40,9 +39,7 @@ func EncryptN(dst io.Writer, concurrent int, recipients ...Recipient) (io.WriteC
 		return nil, err
 	}
 
-	a := stream.Extract[cipher.AEAD](w, "a")
-
-	return stream.NewWriter(a, dst, concurrent), nil
+	return stream.NewWriter(w, dst, concurrent), nil
 }
 
 // Decrypt decrypts a file encrypted to one or more identities.
@@ -65,8 +62,5 @@ func DecryptN(src io.Reader, concurrent int, identities ...Identity) (io.Reader,
 		return nil, err
 	}
 
-	a := stream.Extract[cipher.AEAD](r, "a")
-	src = stream.Extract[io.Reader](r, "src")
-
-	return stream.NewReader(a, src, concurrent), nil
+	return stream.NewReader(r, concurrent), nil
 }

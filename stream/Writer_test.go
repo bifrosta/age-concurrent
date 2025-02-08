@@ -24,7 +24,7 @@ func BenchmarkWriter(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	a := Extract[cipher.AEAD](w, "a")
+	a := extract[cipher.AEAD](w, "a")
 
 	b.Run("realage", func(b *testing.B) {
 		b.ReportAllocs()
@@ -52,7 +52,7 @@ func BenchmarkWriter(b *testing.B) {
 			b.ReportAllocs()
 			b.SetBytes(int64(sz))
 			for i := 0; i < b.N; i++ {
-				w2 := NewWriter(a, io.Discard, cpu)
+				w2 := newWriter(a, io.Discard, cpu)
 				for j := 0; j < writes; j++ {
 					_, _ = w2.Write(buf)
 				}

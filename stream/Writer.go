@@ -53,7 +53,13 @@ type Writer struct {
 	done      chan error
 }
 
-func NewWriter(a cipher.AEAD, dest io.Writer, concurrent int) *Writer {
+func NewWriter(agewriter io.Writer, dest io.Writer, concurrent int) *Writer {
+	a := extract[cipher.AEAD](agewriter, "a")
+
+	return newWriter(a, dest, concurrent)
+}
+
+func newWriter(a cipher.AEAD, dest io.Writer, concurrent int) *Writer {
 	if concurrent < 1 {
 		concurrent = runtime.NumCPU()
 	}

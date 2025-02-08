@@ -46,8 +46,8 @@ func BenchmarkReader(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	a := Extract[cipher.AEAD](payloadR, "a")
-	src := Extract[io.Reader](payloadR, "src")
+	a := extract[cipher.AEAD](payloadR, "a")
+	src := extract[io.Reader](payloadR, "src")
 
 	payload, err := io.ReadAll(src)
 	if err != nil {
@@ -81,7 +81,7 @@ func BenchmarkReader(b *testing.B) {
 				b.ReportAllocs()
 				b.SetBytes(int64(len(payload)))
 				for i := 0; i < b.N; i++ {
-					dec := NewReader(a, bytes.NewReader(payload), cpu)
+					dec := newReader(a, bytes.NewReader(payload), cpu)
 
 					_, _ = io.Copy(io.Discard, wrapReader{dec})
 				}
@@ -90,7 +90,7 @@ func BenchmarkReader(b *testing.B) {
 				b.ReportAllocs()
 				b.SetBytes(int64(len(payload)))
 				for i := 0; i < b.N; i++ {
-					dec := NewReader(a, bytes.NewReader(payload), cpu)
+					dec := newReader(a, bytes.NewReader(payload), cpu)
 					dec.WriteTo(io.Discard)
 				}
 			})
