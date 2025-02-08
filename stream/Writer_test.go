@@ -8,7 +8,7 @@ import (
 	"testing"
 	"unsafe"
 
-	"filippo.io/age"
+	realage "filippo.io/age"
 )
 
 func BenchmarkWriter(b *testing.B) {
@@ -16,17 +16,38 @@ func BenchmarkWriter(b *testing.B) {
 	const writes = 1000
 	const sz = wrSize * writes
 	buf := make([]byte, wrSize)
-	i, err := age.GenerateX25519Identity()
+	i, err := realage.GenerateX25519Identity()
 	if err != nil {
 		b.Fatal(err)
 	}
 	r := i.Recipient()
-	w, err := age.Encrypt(io.Discard, r)
+	w, err := realage.Encrypt(io.Discard, r)
 	if err != nil {
 		b.Fatal(err)
 	}
 
 	a := extractAEAD(w)
+
+	b.Run("realage", func(b *testing.B) {
+		b.ReportAllocs()
+		b.SetBytes(int64(sz))
+
+		real, err := realage.Encrypt(io.Discard, r)
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		for i := 0; i < b.N; i++ {
+			for j := 0; j < writes; j++ {
+				_, err = real.Write(buf)
+				if err != nil {
+					b.Fatal(err)
+				}
+			}
+		}
+
+		real.Close()
+	})
 
 	for cpu := 1; cpu <= 32; cpu *= 2 {
 		b.Run(fmt.Sprintf("cpu:%d", cpu), func(b *testing.B) {
