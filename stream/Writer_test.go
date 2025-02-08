@@ -54,7 +54,7 @@ func BenchmarkWriter(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				w2 := NewWriter(a, io.Discard, cpu)
 				for j := 0; j < writes; j++ {
-					w2.Write(buf)
+					_, _ = w2.Write(buf)
 				}
 				w2.Close()
 			}
