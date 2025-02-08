@@ -11,7 +11,11 @@ import (
 )
 
 type Reader struct {
-	reader io.Reader
+	reader     io.Reader
+	pw         io.PipeWriter
+	readOnce   sync.Once
+	readOnceFn func()
+	writeTo    func(w io.Writer) (int64, error)
 }
 
 func nonceIsZero(nonce *[chacha20poly1305.NonceSize]byte) bool {
@@ -135,17 +139,36 @@ func NewReader(a cipher.AEAD, src io.Reader, concurrent int) *Reader {
 		}()
 	}
 
-	go func() {
+	r.readOnceFn = func() {
+		go func() {
+			for d := range decrypted {
+				buffer := <-d
+
+				// TODO: Handle write errors
+				_, _ = writer.Write(buffer)
+				reBuf <- buffer
+			}
+
+			done <- writer.Close()
+		}()
+	}
+
+	r.writeTo = func(w io.Writer) (int64, error) {
+		var total int64
 		for d := range decrypted {
 			buffer := <-d
 
-			// TODO: Handle write errors
-			_, _ = writer.Write(buffer)
+			n, err := w.Write(buffer)
 			reBuf <- buffer
+			total += int64(n)
+			if err != nil {
+				writer.CloseWithError(err)
+				// Drain decrypted?
+				return total, err
+			}
 		}
-
-		done <- writer.Close()
-	}()
+		return total, writer.Close()
+	}
 
 	go func() {
 		wg.Wait()
@@ -156,5 +179,10 @@ func NewReader(a cipher.AEAD, src io.Reader, concurrent int) *Reader {
 }
 
 func (r *Reader) Read(p []byte) (int, error) {
+	r.readOnce.Do(r.readOnceFn)
 	return r.reader.Read(p)
+}
+
+func (r *Reader) WriteTo(w io.Writer) (int64, error) {
+	return r.writeTo(w)
 }

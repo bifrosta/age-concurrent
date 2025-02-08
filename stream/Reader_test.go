@@ -53,7 +53,6 @@ func BenchmarkReader(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-
 	b.Run("realage", func(b *testing.B) {
 		b.ReportAllocs()
 		b.SetBytes(int64(len(payload)))
@@ -71,17 +70,30 @@ func BenchmarkReader(b *testing.B) {
 			_, _ = io.Copy(io.Discard, real)
 		}
 	})
+	type wrapReader struct {
+		io.Reader
+	}
 
 	for cpu := 1; cpu <= 32; cpu *= 2 {
 		b.Run(fmt.Sprintf("cpu:%d", cpu), func(b *testing.B) {
-			b.ReportAllocs()
-			b.SetBytes(int64(len(payload)))
 
-			for i := 0; i < b.N; i++ {
-				dec := NewReader(a, bytes.NewReader(payload), cpu)
+			b.Run("read", func(b *testing.B) {
+				b.ReportAllocs()
+				b.SetBytes(int64(len(payload)))
+				for i := 0; i < b.N; i++ {
+					dec := NewReader(a, bytes.NewReader(payload), cpu)
 
-				_, _ = io.Copy(io.Discard, dec)
-			}
+					_, _ = io.Copy(io.Discard, wrapReader{dec})
+				}
+			})
+			b.Run("writeto", func(b *testing.B) {
+				b.ReportAllocs()
+				b.SetBytes(int64(len(payload)))
+				for i := 0; i < b.N; i++ {
+					dec := NewReader(a, bytes.NewReader(payload), cpu)
+					dec.WriteTo(io.Discard)
+				}
+			})
 		})
 	}
 }
