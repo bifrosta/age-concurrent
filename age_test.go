@@ -327,3 +327,122 @@ func FuzzDecrypt(f *testing.F) {
 		}
 	})
 }
+
+func TestDecryptBrokenInput(t *testing.T) {
+	_, err := Decrypt(bytes.NewReader([]byte{0x01, 0x02, 0x03}), ident)
+	if err == nil {
+		t.Errorf("expected error, got nil")
+	}
+
+	lengths := []int{
+		0,
+		1,
+		500,
+		65536 / 2,
+		65536 - 1,
+		65536,
+		65536 + 1,
+		65536*2 - 1,
+		65536 * 2,
+		65536*2 + 1,
+		65536*4 - 1,
+		65536 * 4,
+		65536*4 + 1,
+	}
+
+	ident, err := realage.GenerateX25519Identity()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	recipient := ident.Recipient()
+	in := make([]byte, 1024*1024)
+	test := bytes.NewBuffer(nil)
+
+	w, err := realage.Encrypt(test, recipient)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = w.Write(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	data := test.Bytes()
+
+	for _, l := range lengths {
+		t.Run(fmt.Sprintf("%d", l), func(t *testing.T) {
+			r, err := Decrypt(newReader(data, l), ident)
+			if err != nil {
+				return
+			}
+
+			_, err = io.Copy(&writer{}, r)
+			if err == nil {
+				fmt.Printf("expected error, got nil\n")
+				t.Errorf("expected error, got nil")
+			}
+		})
+	}
+}
+
+func TestDecryptBrokenWriter(t *testing.T) {
+	_, err := Decrypt(bytes.NewReader([]byte{0x01, 0x02, 0x03}), ident)
+	if err == nil {
+		t.Errorf("expected error, got nil")
+	}
+
+	lengths := []int{
+		1,
+		500,
+		65536 / 2,
+		65536 - 1,
+		65536,
+		65536 + 1,
+		65536*2 - 1,
+		65536 * 2,
+		65536*2 + 1,
+		65536*4 - 1,
+		65536 * 4,
+		65536*4 + 1,
+	}
+
+	ident, err := realage.GenerateX25519Identity()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	recipient := ident.Recipient()
+	in := make([]byte, 1024*1024)
+	test := bytes.NewBuffer(nil)
+
+	w, err := realage.Encrypt(test, recipient)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = w.Write(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	data := test.Bytes()
+
+	for _, l := range lengths {
+		t.Run(fmt.Sprintf("%d", l), func(t *testing.T) {
+			r, err := Decrypt(bytes.NewReader(data), ident)
+			if err != nil {
+				return
+			}
+
+			_, err = io.Copy(newWriter(l), r)
+			if err == nil {
+				fmt.Printf("expected error, got nil\n")
+				t.Errorf("expected error, got nil")
+			}
+		})
+	}
+}

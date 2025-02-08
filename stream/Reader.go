@@ -6,16 +6,27 @@ import (
 	"io"
 	"runtime"
 	"sync"
+	"sync/atomic"
 
 	"golang.org/x/crypto/chacha20poly1305"
 )
 
 type Reader struct {
 	reader     io.Reader
-	pw         io.PipeWriter
 	readOnce   sync.Once
 	readOnceFn func()
 	writeTo    func(w io.Writer) (int64, error)
+
+	err atomic.Pointer[error]
+}
+
+func (r *Reader) error() error {
+	errPtr := r.err.Load()
+	if errPtr == nil {
+		return nil
+	}
+
+	return *errPtr
 }
 
 func nonceIsZero(nonce *[chacha20poly1305.NonceSize]byte) bool {
@@ -74,7 +85,10 @@ func NewReader(a cipher.AEAD, src io.Reader, concurrent int) *Reader {
 				// The last chunk can be short, but not empty unless it's the first and
 				// only chunk.
 				if !nonceIsZero(&nonce) && n == a.Overhead() {
-					writer.CloseWithError(errors.New("last chunk is empty, try age v1.0.0, and please consider reporting this"))
+					err := errors.New("last chunk is empty, try age v1.0.0, and please consider reporting this")
+
+					r.err.Store(&err)
+					writer.CloseWithError(err)
 
 					return
 				}
@@ -84,6 +98,7 @@ func NewReader(a cipher.AEAD, src io.Reader, concurrent int) *Reader {
 				setLastChunkFlag(&nonce)
 
 			case err != nil:
+				r.err.Store(&err)
 				writer.CloseWithError(err)
 
 				return
@@ -109,7 +124,11 @@ func NewReader(a cipher.AEAD, src io.Reader, concurrent int) *Reader {
 			hasSeenLast := false
 			for j := range todo {
 				if hasSeenLast && len(j.in) > 0 {
-					writer.CloseWithError(errors.New("unexpected data after last block"))
+					err := errors.New("unexpected data after last block")
+
+					r.err.Store(&err)
+					writer.CloseWithError(err)
+
 					return
 				}
 				if j.last {
@@ -128,7 +147,10 @@ func NewReader(a cipher.AEAD, src io.Reader, concurrent int) *Reader {
 					}
 
 					if err != nil {
-						writer.CloseWithError(errors.New("failed to decrypt and authenticate payload chunk"))
+						err := errors.New("failed to decrypt and authenticate payload chunk")
+
+						r.err.Store(&err)
+						writer.CloseWithError(err)
 
 						return
 					}
@@ -154,19 +176,35 @@ func NewReader(a cipher.AEAD, src io.Reader, concurrent int) *Reader {
 	}
 
 	r.writeTo = func(w io.Writer) (int64, error) {
+		err := r.error()
+		if err != nil {
+			return 0, err
+		}
+
 		var total int64
 		for d := range decrypted {
 			buffer := <-d
+
+			err := r.error()
+			if err != nil {
+				return total, err
+			}
 
 			n, err := w.Write(buffer)
 			reBuf <- buffer
 			total += int64(n)
 			if err != nil {
 				writer.CloseWithError(err)
-				// Drain decrypted?
+				// FIXME: Drain decrypted?
 				return total, err
 			}
 		}
+
+		err = r.error()
+		if err != nil {
+			return total, err
+		}
+
 		return total, writer.Close()
 	}
 
