@@ -23,6 +23,10 @@ func TestAead(t *testing.T) {
 
 	sealed := a.Seal(nil, nonce[:], in, nil)
 
+	if len(sealed) != encChunkSize {
+		t.Errorf("unexpected len of sealed data: %d", len(sealed))
+	}
+
 	plain, err := a.Open(nil, nonce[:], sealed, nil)
 	if err != nil {
 		t.Fatal(err)
