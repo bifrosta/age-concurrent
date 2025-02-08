@@ -46,8 +46,8 @@ func BenchmarkReader(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	a := extract[cipher.AEAD](payloadR, "a")
-	src := extract[io.Reader](payloadR, "src")
+	a := Extract[cipher.AEAD](payloadR, "a")
+	src := Extract[io.Reader](payloadR, "src")
 
 	payload, err := io.ReadAll(src)
 	if err != nil {

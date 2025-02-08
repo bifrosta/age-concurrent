@@ -1,4 +1,4 @@
-package age
+package stream
 
 import (
 	"fmt"
@@ -6,11 +6,11 @@ import (
 	"unsafe"
 )
 
-// extract will extract a private field from a
+// Extract a private field from a
 // filippo.io/age/internal/stream Writer or Reader.
 // This is relatively safe, but tied to a specific
 // version of the age module.
-func extract[T any](d any, field string) T {
+func Extract[T any](d any, field string) T {
 	value := reflect.ValueOf(d)
 	elem := value.Elem()
 

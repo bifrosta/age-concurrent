@@ -30,7 +30,7 @@ func Encrypt(dst io.Writer, recipients ...Recipient) (io.WriteCloser, error) {
 		return nil, err
 	}
 
-	a := extract[cipher.AEAD](w, "a")
+	a := stream.Extract[cipher.AEAD](w, "a")
 
 	return stream.NewWriter(a, dst, 0), nil
 }
@@ -45,8 +45,8 @@ func Decrypt(src io.Reader, identities ...Identity) (io.Reader, error) {
 		return nil, err
 	}
 
-	a := extract[cipher.AEAD](r, "a")
-	src = extract[io.Reader](r, "src")
+	a := stream.Extract[cipher.AEAD](r, "a")
+	src = stream.Extract[io.Reader](r, "src")
 
 	return stream.NewReader(a, src, 0), nil
 }
