@@ -57,3 +57,56 @@ func TestAeadFail(t *testing.T) {
 		t.Error("unexpected success")
 	}
 }
+
+func BenchmarkAeadOpen(b *testing.B) {
+	const opens = 100
+
+	a, err := chacha20poly1305.New([]byte("key1key1key1key1key1key1key1key1"))
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	nonce := make([]byte, chacha20poly1305.NonceSize)
+
+	in := make([]byte, ChunkSize)
+
+	sealed := a.Seal(nil, nonce, in, nil)
+
+	b.SetBytes(int64(len(sealed) * opens))
+	b.ReportAllocs()
+
+	out := make([]byte, ChunkSize)
+
+	for i := 0; i < b.N; i++ {
+		for j := 0; j < opens; j++ {
+			_, err := a.Open(out[:0], nonce, sealed, nil)
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	}
+}
+
+func BenchmarkAeadSeal(b *testing.B) {
+	const seals = 100
+
+	a, err := chacha20poly1305.New([]byte("key1key1key1key1key1key1key1key1"))
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	nonce := make([]byte, chacha20poly1305.NonceSize)
+
+	in := make([]byte, ChunkSize)
+
+	b.SetBytes(int64(len(in) * seals))
+	b.ReportAllocs()
+
+	out := make([]byte, encChunkSize)
+
+	for i := 0; i < b.N; i++ {
+		for j := 0; j < seals; j++ {
+			_ = a.Seal(out[:0], nonce, in, nil)
+		}
+	}
+}
