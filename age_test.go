@@ -2,6 +2,7 @@ package age
 
 import (
 	"bytes"
+	"crypto/rand"
 	"fmt"
 	"io"
 	"runtime"
@@ -229,4 +230,100 @@ func TestEncrypt(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestEncryptMismatch(t *testing.T) {
+	for _, c := range cases {
+		t.Run(fmt.Sprintf("%d", len(c)), func(t *testing.T) {
+			test := []byte(c)
+
+			buf := bytes.NewBuffer(nil)
+
+			w, err := Encrypt(buf, recipient2)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			_, err = w.Write(test)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			err = w.Close()
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			_, err = realage.Decrypt(buf, ident)
+			if err == nil {
+				t.Errorf("expected error, got nil")
+			}
+		})
+	}
+}
+
+func FuzzDecrypt(f *testing.F) {
+	lengths := []int{
+		0,
+		1,
+		500,
+		65536 / 2,
+		65536 - 1,
+		65536,
+		65536 + 1,
+		65536*2 - 1,
+		65536 * 2,
+		65536*2 + 1,
+		65536*4 - 1,
+		65536 * 4,
+		65536*4 + 1,
+	}
+
+	ident, err := realage.GenerateX25519Identity()
+	if err != nil {
+		f.Fatal(err)
+	}
+
+	recipient := ident.Recipient()
+
+	for _, l := range lengths {
+		in := make([]byte, l)
+
+		_, err = rand.Read(in)
+		if err != nil {
+			f.Fatal(err)
+		}
+
+		testFile := bytes.NewBuffer(nil)
+
+		w, err := realage.Encrypt(testFile, recipient)
+		if err != nil {
+			f.Fatal(err)
+		}
+
+		_, err = w.Write(in)
+		if err != nil {
+			f.Fatal(err)
+		}
+
+		f.Add(testFile.Bytes())
+
+		// Verify that the real age can decrypt the file "unfuzzed".
+		_, err = Decrypt(bytes.NewReader(testFile.Bytes()), ident)
+		if err != nil {
+			f.Errorf("unexpected error: %v", err)
+		}
+	}
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		r, err := Decrypt(bytes.NewReader(data), ident)
+		if err != nil {
+			t.SkipNow()
+		}
+
+		_, err = io.Copy(io.Discard, r)
+		if err != nil {
+			panic(err)
+		}
+	})
 }
