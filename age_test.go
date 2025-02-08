@@ -226,7 +226,7 @@ func TestEncrypt(t *testing.T) {
 			}
 
 			if !bytes.Equal(out.Bytes(), test) {
-				t.Errorf("unexpected output: %q", out.Bytes())
+				t.Errorf("unexpected output")
 			}
 		})
 	}
