@@ -121,14 +121,13 @@ func (w *Writer) Write(p []byte) (n int, err error) {
 }
 
 func (w *Writer) Close() error {
-	if w.fill > 0 {
-		in := w.inbuffer[:w.fill]
-		out := make(chan []byte, 1)
-		nonce := w.nonce
-		setLastChunkFlag(&nonce)
-		out <- w.a.Seal(in[:0], nonce[:], in, nil)
-		w.encrypted <- out
-	}
+	in := w.inbuffer[:w.fill]
+	out := make(chan []byte, 1)
+	nonce := w.nonce
+	setLastChunkFlag(&nonce)
+	out <- w.a.Seal(in[:0], nonce[:], in, nil)
+	w.encrypted <- out
+
 	close(w.encrypted)
 
 	return <-w.done
