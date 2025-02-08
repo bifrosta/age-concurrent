@@ -1,6 +1,8 @@
 # age-concurrent
 
-A concurrent, API-compatible implementation of [FiloSottile/age](https://github.com/FiloSottile/age), providing efficient encryption and decryption using multiple workers.
+A concurrent, API-compatible wrapper around
+[FiloSottile/age](https://github.com/FiloSottile/age), providing
+efficient encryption and decryption using multiple workers.
 
 ## Overview
 
